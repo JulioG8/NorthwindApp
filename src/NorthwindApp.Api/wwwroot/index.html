@@ -1,0 +1,247 @@
+<!DOCTYPE html>
+<html lang="en" ng-app="northwindApp">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Customers By Country - Northwind App</title>
+
+    <!-- Bootstrap CSS -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/css/bootstrap.min.css" />
+
+    <!-- Kendo UI CSS -->
+    <link rel="stylesheet" href="https://kendo.cdn.telerik.com/2023.1.117/styles/kendo.common.min.css" />
+    <link rel="stylesheet" href="https://kendo.cdn.telerik.com/2023.1.117/styles/kendo.bootstrap-v4.min.css" />
+
+    <style>
+        body { padding-top: 20px; }
+        .search-container { margin-bottom: 20px; }
+        .k-grid { margin-top: 15px; }
+        a.customer-link,
+        .k-grid a.customer-link,
+        .k-grid td a.customer-link,
+        .k-grid-content a.customer-link {
+            color: #0066cc !important;
+            cursor: pointer !important;
+            text-decoration: underline !important;
+            font-weight: 600 !important;
+            display: inline-block;
+        }
+        a.customer-link:hover,
+        .k-grid a.customer-link:hover,
+        .k-grid td a.customer-link:hover,
+        .k-grid-content a.customer-link:hover {
+            color: #004499 !important;
+            text-decoration: underline !important;
+            background-color: #e6f0ff;
+        }
+        .loading-spinner {
+            display: flex;
+            justify-content: center;
+            padding: 20px;
+        }
+    </style>
+</head>
+<body ng-controller="CustomersByCountryController">
+    <div class="container">
+        <div class="row">
+            <div class="col-12">
+                <h2>Customers By Country</h2>
+                <hr />
+            </div>
+        </div>
+
+        <!-- Search Form (Angular submit event) -->
+        <div class="row search-container">
+            <div class="col-md-6">
+                <form ng-submit="searchCustomers()">
+                    <div class="input-group">
+                        <input type="text"
+                               class="form-control"
+                               placeholder="Enter country name (e.g., USA, Germany, UK)"
+                               ng-model="searchCountry"
+                               required />
+                        <div class="input-group-append">
+                            <button class="btn btn-primary" type="submit">
+                                Search
+                            </button>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+
+        <!-- Loading indicator -->
+        <div class="row" ng-show="isLoading">
+            <div class="col-12 loading-spinner">
+                <div class="spinner-border text-primary" role="status">
+                    <span class="sr-only">Loading...</span>
+                </div>
+            </div>
+        </div>
+
+        <!-- No results message -->
+        <div class="row" ng-show="!isLoading && hasSearched && customers.length === 0">
+            <div class="col-12">
+                <div class="alert alert-info">
+                    No customers found for country: <strong>{{lastSearchedCountry}}</strong>
+                </div>
+            </div>
+        </div>
+
+        <!-- Kendo Grid Container -->
+        <div class="row" ng-show="customers.length > 0">
+            <div class="col-12">
+                <div id="customersGrid"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <!-- jQuery (required for Kendo UI) -->
+    <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
+
+    <!-- Bootstrap JS -->
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@4.6.2/dist/js/bootstrap.bundle.min.js"></script>
+
+    <!-- AngularJS -->
+    <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.8.2/angular.min.js"></script>
+
+    <!-- Kendo UI -->
+    <script src="https://kendo.cdn.telerik.com/2023.1.117/js/kendo.all.min.js"></script>
+
+    <script>
+        // AngularJS Application
+        var app = angular.module('northwindApp', []);
+
+        // API Configuration
+        var API_BASE_URL = 'http://localhost:8082/api';
+
+        // Utility function to get URL parameter
+        function getQueryParam(name) {
+            var urlParams = new URLSearchParams(window.location.search);
+            return urlParams.get(name);
+        }
+
+        // CustomersByCountry Controller
+        app.controller('CustomersByCountryController', ['$scope', '$http', function($scope, $http) {
+            // Initialize scope variables
+            $scope.searchCountry = '';
+            $scope.customers = [];
+            $scope.isLoading = false;
+            $scope.hasSearched = false;
+            $scope.lastSearchedCountry = '';
+
+            // Check if country parameter exists in URL (from back navigation)
+            var countryFromUrl = getQueryParam('country');
+            if (countryFromUrl) {
+                $scope.searchCountry = countryFromUrl;
+                // Trigger search after Angular digest
+                setTimeout(function() {
+                    $scope.$apply(function() {
+                        $scope.searchCustomers();
+                    });
+                }, 100);
+            }
+
+            // Search customers by country (Angular submit event)
+            $scope.searchCustomers = function() {
+                var country = $scope.searchCountry.trim();
+
+                if (!country) {
+                    alert('Please enter a country name');
+                    return;
+                }
+
+                $scope.isLoading = true;
+                $scope.hasSearched = true;
+                $scope.lastSearchedCountry = country;
+
+                // Call API using Kendo DataSource
+                var dataSource = new kendo.data.DataSource({
+                    transport: {
+                        read: {
+                            url: API_BASE_URL + '/customers/country/' + encodeURIComponent(country),
+                            dataType: 'json'
+                        }
+                    },
+                    schema: {
+                        model: {
+                            id: 'customerId',
+                            fields: {
+                                customerId: { type: 'string' },
+                                companyName: { type: 'string' },
+                                contactName: { type: 'string' },
+                                phone: { type: 'string' },
+                                fax: { type: 'string' }
+                            }
+                        }
+                    },
+                    sort: { field: 'contactName', dir: 'asc' },
+                    requestEnd: function(e) {
+                        $scope.$apply(function() {
+                            $scope.customers = e.response || [];
+                            $scope.isLoading = false;
+                        });
+                    },
+                    error: function(e) {
+                        $scope.$apply(function() {
+                            $scope.isLoading = false;
+                            $scope.customers = [];
+                        });
+                        alert('Error fetching customers. Please try again.');
+                    }
+                });
+
+                // Initialize or refresh Kendo Grid
+                var grid = $('#customersGrid').data('kendoGrid');
+                if (grid) {
+                    grid.setDataSource(dataSource);
+                } else {
+                    $('#customersGrid').kendoGrid({
+                        dataSource: dataSource,
+                        sortable: true,
+                        pageable: {
+                            pageSize: 10,
+                            pageSizes: [5, 10, 20, 50]
+                        },
+                        filterable: true,
+                        columns: [
+                            {
+                                field: 'customerId',
+                                title: 'Customer ID',
+                                width: '120px',
+                                template: function(dataItem) {
+                                    var country = $scope.lastSearchedCountry || '';
+                                    return '<a class="customer-link" href="orders.html?customerId=' + encodeURIComponent(dataItem.customerId) + '&country=' + encodeURIComponent(country) + '">' + kendo.htmlEncode(dataItem.customerId) + '</a>';
+                                }
+                            },
+                            {
+                                field: 'companyName',
+                                title: 'Company Name',
+                                width: '250px'
+                            },
+                            {
+                                field: 'contactName',
+                                title: 'Contact Name',
+                                width: '180px'
+                            },
+                            {
+                                field: 'phone',
+                                title: 'Phone Number',
+                                width: '150px'
+                            },
+                            {
+                                field: 'fax',
+                                title: 'Fax Number',
+                                width: '150px'
+                            }
+                        ]
+                    });
+                }
+
+                dataSource.read();
+            };
+        }]);
+    </script>
+</body>
+</html>

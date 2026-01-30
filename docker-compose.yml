@@ -1,0 +1,41 @@
+services:
+  sqlserver:
+    image: mcr.microsoft.com/azure-sql-edge:latest
+    container_name: northwind-sqlserver
+    environment:
+      - ACCEPT_EULA=Y
+      - MSSQL_SA_PASSWORD=YourStrong@Passw0rd
+    ports:
+      - "1433:1433"
+    volumes:
+      - sqlserver_data:/var/opt/mssql
+
+  sqlserver-init:
+    image: mcr.microsoft.com/mssql-tools:latest
+    container_name: northwind-init
+    depends_on:
+      - sqlserver
+    volumes:
+      - ./Database:/scripts
+    entrypoint: ["/bin/bash", "-c"]
+    command:
+      - |
+        echo "Waiting for SQL Server to start..."
+        sleep 30
+        for i in {1..30}; do
+          /opt/mssql-tools/bin/sqlcmd -S sqlserver -U sa -P 'YourStrong@Passw0rd' -Q "SELECT 1" > /dev/null 2>&1
+          if [ $$? -eq 0 ]; then
+            echo "SQL Server is ready!"
+            break
+          fi
+          echo "Waiting... ($$i/30)"
+          sleep 5
+        done
+        echo "Creating database..."
+        /opt/mssql-tools/bin/sqlcmd -S sqlserver -U sa -P 'YourStrong@Passw0rd' -i /scripts/01-CreateNorthwindDatabase.sql
+        echo "Inserting sample data..."
+        /opt/mssql-tools/bin/sqlcmd -S sqlserver -U sa -P 'YourStrong@Passw0rd' -i /scripts/02-InsertSampleData.sql
+        echo "Database initialization complete!"
+
+volumes:
+  sqlserver_data:
