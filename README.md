@@ -1,4 +1,4 @@
-# Northwind Application - Documentacion Tecnica te amo mucho mi amor
+# Northwind Application - Documentacion Tecnica 
 
 ## Prueba Tecnica - Desarrollador .NET
 
