@@ -40,7 +40,7 @@ public class CustomersController : ControllerBase
         var customer = await _customerService.GetCustomerByIdAsync(customerId);
 
         if (customer == null)
-            return NotFound($"Customer with ID '{customerId}' not found");
+            return NotFound($"Customer with ID '{te amo qlito}' not found");
 
         return Ok(customer);
     }
